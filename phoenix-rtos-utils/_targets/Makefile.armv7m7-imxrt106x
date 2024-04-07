@@ -1,0 +1,15 @@
+#
+# Makefile for Phoenix-RTOS 3 device drivers
+#
+# iMX RT tool set
+#
+# Copyright 2019, 2023 Phoenix Systems
+#
+
+DEFAULT_COMPONENTS := psh meterfs-migrate
+
+ifneq (, $(findstring 106, $(TARGET)))
+  DEFAULT_COMPONENTS += psd
+else ifneq (, $(findstring 105, $(TARGET)))
+  # placeholder
+endif

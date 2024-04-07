@@ -1,0 +1,193 @@
+#!/bin/bash
+#
+# Shell script for building armv7a7-imx6ull project
+#
+# Copyright 2018, 2019, 2020, 2021, 2023 Phoenix Systems
+# Author: Kaja Swat, Aleksander Kaminski, Pawel Pisarczyk, Lukasz Kosinski, Maciej Purski, Hubert Badocha
+#
+[ "${BASH_SOURCE[0]}" -ef "$0" ] && echo "You should source this script, not execute it!" && exit 1
+
+. "_targets/build.common"
+
+CROSS=arm-phoenix-
+
+export BUSYBOX_CONFIG="$(realpath "busybox_config")"
+export DROPBEAR_CUSTOM_CFLAGS="-DLTC_NO_BSWAP"
+export PSH_DEFUSRPWDHASH="0B1ANiYi45IhxkfmUW155/GBd4IRE="
+
+#
+# Ports configuration
+#
+export PORTS_BUSYBOX=y
+export PORTS_PCRE=y
+export PORTS_OPENSSL=y
+export PORTS_LIGHTTPD=y
+export PORTS_DROPBEAR=y
+export PORTS_LUA=n
+export PORTS_LZO=y
+export PORTS_OPENVPN=y
+export PORTS_JANSSON=y
+export PORTS_CURL=y
+
+#
+# Platform dependent parameters
+#
+SIZE_PAGE=$((0x1000))
+PAGE_MASK=$((~(SIZE_PAGE - 1)))
+KERNEL_OFFS=$((0x0))              # Disk image kernel offset (in bytes)
+ADDR_DDR=$((0x80000000))
+
+
+#
+# Project specific build
+#
+BOOT_DEVICE="flash0"              # Default boot device
+NAME_USER_SCRIPT="user.plo"       # User script name
+MAGIC_USER_SCRIPT=$((0xdabaabad)) # User script magic value
+OFFS_USER_SCRIPT=$((0x0))         # Disk image user script offset (in bytes)
+OFFS_ROOTFS=$((0x1000))           # Disk image rootfs offset (in 512 byte sectors)
+ERASE_SIZE=$((64 * 4096))         # Rootfs disk erase block size (in bytes)
+CLEANMARKER_SIZE=$((0))           # JFFS2 cleanmarker size (in bytes)
+
+
+
+# Pre-init script is launched before user script
+PREINIT_SCRIPT=(
+	"map ddr 0x80000000 0x87ffffff rwx"
+	"phfs usb0 1.2 phoenixd"
+	"console 0.0"
+)
+
+
+#TODO: if flash driver for imx6ull-evk implementation is introduced, psh should be replaced by imx6ul-flash and psd
+# This is temporary solution for running a system image in RAM
+UPLOAD_SCRIPT=(
+	"wait 2000"
+	"kernel ${BOOT_DEVICE}"
+	"app ${BOOT_DEVICE} -x dummyfs ddr ddr"
+	"app ${BOOT_DEVICE} -x imx6ull-uart ddr ddr"
+	"app ${BOOT_DEVICE} -x psh ddr ddr"
+	"go!"
+)
+
+
+PRIMARY_SCRIPT=(
+	"wait 2000"
+	"kernel ${BOOT_DEVICE}"
+	"app ${BOOT_DEVICE} -x dummyfs ddr ddr"
+	"app ${BOOT_DEVICE} -x imx6ull-uart ddr ddr"
+	"app ${BOOT_DEVICE} -x psh ddr ddr"
+	"go!"
+)
+
+
+b_build_project() {
+	b_log "Building user applications"
+	make -C "_user" all install
+}
+
+
+b_build_target() {
+	b_log "Building $TARGET project"
+	if [ "$KERNEL_PLO_BOOT" = "y" ]; then
+		b_log "Building PLO"
+
+		b_mkscript_preinit
+		make -C plo all
+
+		cp -a "phoenix-rtos-hostutils/psu/plo-ram-${TARGET_FAMILY}-${TARGET_SUBFAMILY}.sdp" "$PREFIX_BOOT/plo-ram.sdp"
+		cp -a "${PREFIX_PROG_STRIPPED}plo-ram-${TARGET_FAMILY}-${TARGET_SUBFAMILY}.img" "$PREFIX_BOOT/plo-ram.img"
+	fi
+}
+
+
+# Temporary solution to omit phoenix-rtos-loader
+b_syspage_gen() {
+	img="$1"
+	uscript="$2"
+
+	fn="${PREFIX_PROG}phoenix-${TARGET_FAMILY}-${TARGET_SUBFAMILY}.elf"
+	vectors=$(${CROSS}readelf -s "$fn" | awk '/init_vectors/ { printf("0x%s", $2) }')
+	syspage=$(${CROSS}readelf -s "$fn" | awk '/syspage_data/ { printf("0x%s", $2) }')
+	plugin=$(${CROSS}readelf -s "$fn" | awk '/plugin_ivt/ { printf("0x%s", $2) }')
+
+	addr=$((syspage-vectors))
+	sz=$((plugin-syspage))
+
+	"$PREFIX_BOOT/syspagen" \
+		-a 32\
+		-s "$ADDR_DDR:$addr:$sz" \
+		-p "$PLO_SCRIPT_DIR/script.plo" \
+		-u "$uscript" \
+		-i "$img"
+}
+
+
+# Defined as a function instead of a constant as $PREFIX_BOOT is not set at top level.
+b_rootfs_path_get_target() {
+	echo "$PREFIX_BOOT/rootfs.jffs2"
+}
+
+
+b_image_target() {
+	b_log "Creating image from $PREFIX_ROOTFS"
+
+	b_mkscript_user "${UPLOAD_SCRIPT[@]}"
+
+	if [ "$KERNEL_PLO_BOOT" = "y" ]; then
+		b_log "Image will boot from PLO."
+
+		b_log "FLASH image"
+		b_mkscript_user "${PRIMARY_SCRIPT[@]}"
+		b_prod_image
+	else
+		# Parsed by syspagen for map and console commands.
+		b_mkscript_preinit
+
+		# Build production image
+		b_log "RAM Image"
+		b_kernel_image "$PREFIX_BOOT/phoenix.img"
+		b_syspage_gen "$PREFIX_BOOT/phoenix.img" "$PLO_SCRIPT_DIR/$NAME_USER_SCRIPT"
+
+		b_log "FLASH Image"
+		# This is a workaround for target not using PLO.
+		# As plo is not used user script is used only to:
+		#    - upload executable binary file instead of elf to the board(kernelimg),
+		#    - upload required apps(app).
+		b_mkscript_user "${PRIMARY_SCRIPT[@]}"
+		b_kernel_image "$PREFIX_BOOT/phoenix-kernel.img"
+		b_syspage_gen "$PREFIX_BOOT/phoenix-kernel.img" "$PLO_SCRIPT_DIR/$NAME_USER_SCRIPT"
+	fi
+
+	b_log "Creating rootfs"
+	# FIXME: does work only on macOS, for now hackish solution based on extending PATH
+	mtd-utils/build.sh
+	PATH="$(pwd)/_build/host-generic-pc/prog/:$PATH"
+
+	ROOTFS=$(b_rootfs_path_get_target)
+
+	if [ $CLEANMARKER_SIZE -eq 0 ]; then
+		CLEANMARKER_ARG=("-n")
+	else
+		CLEANMARKER_ARG=("-c" "$CLEANMARKER_SIZE")
+	fi
+
+	mkfs.jffs2 -U "${CLEANMARKER_ARG[@]}" -l -m none -e $ERASE_SIZE -s $SIZE_PAGE -r "$PREFIX_ROOTFS"/ -o "$ROOTFS"
+
+	if sumtool "${CLEANMARKER_ARG[@]}" -e $ERASE_SIZE -l -i "$ROOTFS" -o "$ROOTFS.tmp" 2> /dev/null; then
+		echo "JFFS2 Summary nodes created"
+		mv "$ROOTFS.tmp" "$ROOTFS"
+	fi
+
+	sz=$(du -k "$ROOTFS" | awk '{ print $1 }')
+	echo "rootfs size: ${sz}KB"
+}
+
+
+b_test_target() {
+	b_log "Build and install tests in the phoenix-rtos filesystem"
+	make -C "phoenix-rtos-tests" all install
+}
+
+
+export -f b_build_target
