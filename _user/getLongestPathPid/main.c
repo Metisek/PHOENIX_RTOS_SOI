@@ -3,8 +3,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#define SYSCALL_GET_LONGEST_PATH_PID 437
-
 int main(int argc, char** argv)
 {
     pid_t pidToIgnore = -1;
@@ -20,10 +18,10 @@ int main(int argc, char** argv)
     // Wywołanie syscalls_getLongestPathPid
     int longestPathPid = 0;
     longestPathPid = getLongestPathPid(pidToIgnore);
-    if (longestPathPid >= -999)
-        printf("PID procesu mającego najdłuższą ścieżkę potomków: %d\n", longestPathPid);
+    if (longestPathPid >= -1)
+        printf("PID of the process having the longest path of descendants: %d\n", longestPathPid);
     else
-        printf("Błąd podczas wywoływania syscalls_getLongestPathPid\n");
+        printf("Error while calling syscalls_getLongestPathPid\n");
 
     return 0;
 }

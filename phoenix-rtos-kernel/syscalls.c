@@ -90,8 +90,9 @@ int syscalls_getLongestPathPid(void* ustack) {
 	int pathLength;
 	pid_t ignoredPid = -1;
     GETFROMSTACK(ustack, int, ignoredPid, 0);
+	int max_process = process_getPid(proc_current()->process);
 
-    for (i = 1; i < 15 ; i++) {
+    for (i = 0; i < max_process; i++) {
 		pathLength = 0;
 		unsigned int currentPid = i;
         process_info_t *curr_proc = _pinfo_find(currentPid); // Change this line
@@ -100,6 +101,9 @@ int syscalls_getLongestPathPid(void* ustack) {
 			while (currentPid != 0){
 				if (i == ignoredPid){
 					isIgnoredPidInRelation = 1;
+					break;
+				}
+				if (currentPid == posix_getppid(currentPid)){
 					break;
 				}
 				currentPid = posix_getppid(currentPid);
@@ -117,15 +121,15 @@ int syscalls_getLongestPathPid(void* ustack) {
     return longestPathPid;
 }
 
-// Funkcja pomocnicza do rekurencyjnego obliczania długości ścieżki
-int calculatePathLength(int pid) {
+int syscalls_getPathLength(void* ustack) {
+    int longestPathPid = -1;
     int longestPathLength = -1;
     int i;
 	int pathLength;
 	pid_t ignoredPid = -1;
     GETFROMSTACK(ustack, int, ignoredPid, 0);
 
-    for (i = 1; i < 15 ; i++) {
+    for (i = 0; i < 32768 ; i++) {
 		pathLength = 0;
 		unsigned int currentPid = i;
         process_info_t *curr_proc = _pinfo_find(currentPid); // Change this line
@@ -136,6 +140,9 @@ int calculatePathLength(int pid) {
 					isIgnoredPidInRelation = 1;
 					break;
 				}
+				if (currentPid == posix_getppid(currentPid)){
+					break;
+				}
 				currentPid = posix_getppid(currentPid);
 				pathLength += 1;
 			}
@@ -144,29 +151,11 @@ int calculatePathLength(int pid) {
 			}
 			if (pathLength > longestPathLength) {
 				longestPathLength = pathLength;
+				longestPathPid = i;
 			}
 		}
     }
-    return longestPathLength;
-}
-
-int syscalls_getPathLength(void* ustack) {
-    int pathLength = -1;
-	pid_t ignoredPid = -1;
-    int i;
-
-    GETFROMSTACK(ustack, int, ignoredPid, 0);
-
-    for (i = 0; i < numProcesses; i++) {
-        if (processes[i].pid == ignoredPid)
-            continue;
-
-        int currentPathLength = calculatePathLength(processes[i].pid);
-        if (currentPathLength > pathLength)
-            pathLength = currentPathLength;
-    }
-
-    return pathLength;
+    return longestPathPid;
 }
 
 
