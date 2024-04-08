@@ -99,24 +99,19 @@ int syscalls_getLongestPathPid(void* ustack) {
 		unsigned int currentPid = i;
         process_info_t *curr_proc = _pinfo_find(currentPid); // Change this line
 		if (curr_proc != NULL) { // Check if curr_proc is not NULL
-		    int isIgnoredPidInRelation = 0;
 			while (currentPid != 0){
-				if (currentPid == ignoredPid){
-					isIgnoredPidInRelation = 1;
-					break;
-				}
 				if (currentPid == posix_getppid(currentPid)){
 					break;
 				}
 				currentPid = posix_getppid(currentPid);
 				pathLength += 1;
-			}
-			if (isIgnoredPidInRelation == 1){
-				continue;
-			}
-			if (pathLength > longestPathLength) {
-				longestPathLength >= pathLength;
-				longestPathPid = i;
+				if (currentPid == ignoredPid){
+					break;
+				}
+				if (pathLength > longestPathLength) {
+					longestPathLength = pathLength;
+					longestPathPid = currentPid;
+				}
 			}
 		}
     }
@@ -137,26 +132,21 @@ int syscalls_getPathLength(void* ustack) {
 		unsigned int currentPid = i;
         process_info_t *curr_proc = _pinfo_find(currentPid); // Change this line
 		if (curr_proc != NULL) { // Check if curr_proc is not NULL
-		    int isIgnoredPidInRelation = 0;
 			while (currentPid != 0){
-				if (currentPid == ignoredPid){
-					isIgnoredPidInRelation = 1;
-					break;
-				}
 				if (currentPid == posix_getppid(currentPid)){
 					break;
 				}
 				currentPid = posix_getppid(currentPid);
 				pathLength += 1;
+				if (currentPid == ignoredPid){
+					break;
+				}
+				if (pathLength > longestPathLength) {
+					longestPathLength = pathLength;
+				}
 			}
-			if (isIgnoredPidInRelation == 1){
-				continue;
-			}
-			if (pathLength >= longestPathLength) {
-				longestPathLength = pathLength;
-			}
-		}
-    }
+   	 	}
+	}
     return longestPathLength;
 }
 
