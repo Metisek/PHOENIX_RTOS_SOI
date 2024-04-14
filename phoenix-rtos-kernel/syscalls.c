@@ -87,34 +87,31 @@ int syscalls_getLongestPathPid(void* ustack) {
     int longestPathPid = -1;
     int longestPathLength = -1;
     int i;
+	int *pid_c;
 	int pathLength;
 	pid_t ignoredPid = -1;
     GETFROMSTACK(ustack, int, ignoredPid, 0);
+
 	int max_process = process_getPid(proc_current()->process);
 
-    for (i = 0; i < 32767; i++) {
+    for (i = 0; i < max_process + 10; i++) {
 		pathLength = 0;
 		unsigned int currentPid = i;
         process_info_t *curr_proc = _pinfo_find(currentPid); // Change this line
 		if (curr_proc != NULL) { // Check if curr_proc is not NULL
-		    int isIgnoredPidInRelation = 0;
 			while (currentPid != 0){
-				if (i == ignoredPid){
-					isIgnoredPidInRelation = 1;
-					break;
-				}
 				if (currentPid == posix_getppid(currentPid)){
 					break;
 				}
 				currentPid = posix_getppid(currentPid);
 				pathLength += 1;
-			}
-			if (isIgnoredPidInRelation == 1){
-				continue;
-			}
-			if (pathLength > longestPathLength) {
-				longestPathLength = pathLength;
-				longestPathPid = i;
+				if (currentPid == ignoredPid){
+					break;
+				}
+				if (pathLength > longestPathLength) {
+					longestPathLength = pathLength;
+					longestPathPid = currentPid;
+				}
 			}
 		}
     }
@@ -127,33 +124,29 @@ int syscalls_getPathLength(void* ustack) {
 	int pathLength;
 	pid_t ignoredPid = -1;
     GETFROMSTACK(ustack, int, ignoredPid, 0);
+
 	int max_process = process_getPid(proc_current()->process);
 
-    for (i = 0; i < 32767; i++) {
+    for (i = 0; i < max_process + 10; i++) {
 		pathLength = 0;
 		unsigned int currentPid = i;
         process_info_t *curr_proc = _pinfo_find(currentPid); // Change this line
 		if (curr_proc != NULL) { // Check if curr_proc is not NULL
-		    int isIgnoredPidInRelation = 0;
 			while (currentPid != 0){
-				if (i == ignoredPid){
-					isIgnoredPidInRelation = 1;
-					break;
-				}
 				if (currentPid == posix_getppid(currentPid)){
 					break;
 				}
 				currentPid = posix_getppid(currentPid);
 				pathLength += 1;
+				if (currentPid == ignoredPid){
+					break;
+				}
+				if (pathLength > longestPathLength) {
+					longestPathLength = pathLength;
+				}
 			}
-			if (isIgnoredPidInRelation == 1){
-				continue;
-			}
-			if (pathLength > longestPathLength) {
-				longestPathLength = pathLength;
-			}
-		}
-    }
+   	 	}
+	}
     return longestPathLength;
 }
 
