@@ -543,44 +543,73 @@ static int _threads_checkSignal(thread_t *selected, process_t *proc, cpu_context
 
 int _threads_schedule(unsigned int n, cpu_context_t *context, void *arg)
 {
-	thread_t *current, *selected;
+	thread_t *current, *selected = NULL;
 	unsigned int i;
 	process_t *proc;
 	cpu_context_t *signalCtx, *selCtx;
-
 	(void)arg;
 	(void)n;
 	hal_lockScheduler();
-
 	current = _proc_current();
-	threads_common.current[hal_cpuGetID()] = NULL;
-
-	/* Save current thread context */
-	if (current != NULL) {
-		current->context = context;
-
-		/* Move thread to the end of queue */
-		if (current->state == READY) {
-			LIST_ADD(&threads_common.ready[current->priority], current);
-			_perf_preempted(current);
+	/* Do we need to reschedule or did the current thread exhaused it's time slots? */
+	if (current == NULL || current->state != READY || --current->slots <= 0) {
+		threads_common.current[hal_cpuGetID()] = NULL;
+		/* Save current thread context */
+		if (current != NULL) {
+			current->context = context;
+			/* Move thread to the end of queue */
+			if (current->state == READY) {
+				LIST_ADD(&threads_common.ready[current->priority], current);
+				_perf_preempted(current);
+			}
 		}
-	}
+		/* Get next thread */
+		for (i = 0; i < sizeof(threads_common.ready) / sizeof(thread_t *); ++i) {
+			time_t minTime = 0x7fffffffffffffffLL;
+			thread_t *candidate = threads_common.ready[i];
+			/* Iterate over all threads on the current list */
+			do {
+				if (candidate == NULL) {
+					/* No more threads on this list */
+					break;
+				}
 
-	/* Get next thread */
-	for (i = 0; i < sizeof(threads_common.ready) / sizeof(thread_t *);) {
-		if ((selected = threads_common.ready[i]) == NULL) {
-			i++;
-			continue;
+				if (candidate->exit && !hal_cpuSupervisorMode(candidate->context)) {
+					/* Found a thread to be killed, move it to the ghost list and continue */
+					thread_t *victim = candidate;
+					candidate = candidate->next;
+					LIST_REMOVE(&threads_common.ready[i], victim);
+
+					victim->state = GHOST;
+					LIST_ADD(&threads_common.ghosts, victim);
+					_proc_threadWakeup(&threads_common.reaper);
+
+				/* If we just removed the last thread then go to the next list */
+				if (threads_common.ready[i] == NULL) {
+						break;
+					}
+				}
+
+				/* Check if the currently considered thread has the lowest
+				 * total  cpu time so far.
+				 */
+				if (candidate->cpuTime < minTime) {
+					minTime = candidate->cpuTime;
+					selected = candidate;
+				}
+
+				candidate = candidate->next;
+			} while (candidate != threads_common.ready[i]);
+
+			/* Did we find a thread on this list? */
+			if (selected != NULL) {
+				/* Found a thread */
+				/* Init time slots for newly selected thread */
+				selected->slots = 8 - selected->priorityBase;
+				LIST_REMOVE(&threads_common.ready[i], selected);
+				break;
+			}
 		}
-
-		LIST_REMOVE(&threads_common.ready[i], selected);
-
-		if (!selected->exit || hal_cpuSupervisorMode(selected->context))
-			break;
-
-		selected->state = GHOST;
-		LIST_ADD(&threads_common.ghosts, selected);
-		_proc_threadWakeup(&threads_common.reaper);
 	}
 
 	LIB_ASSERT(selected != NULL, "no threads to schedule");

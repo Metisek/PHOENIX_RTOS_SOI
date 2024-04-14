@@ -81,8 +81,11 @@ typedef struct _thread_t {
 	time_t cpuTime;
 	time_t lastTime;
 
+	int slots;
+
 	cpu_context_t *context;
 } thread_t;
+
 
 
 static inline int proc_getTid(thread_t *t)
