@@ -1,3 +1,0 @@
-# Sensorhub
-
-Documentation under development.

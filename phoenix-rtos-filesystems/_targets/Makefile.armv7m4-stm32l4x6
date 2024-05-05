@@ -1,9 +1,0 @@
-#
-# Makefile for Phoenix-RTOS 3 filesystems
-#
-# STM32L4 drivers
-#
-# Copyright 2020 Phoenix Systems
-#
-
-DEFAULT_COMPONENTS := libdummyfs dummyfs libmeterfs

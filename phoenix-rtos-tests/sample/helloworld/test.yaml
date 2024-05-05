@@ -1,5 +1,0 @@
-test:
-    tests:
-        - name: main
-          harness: test.py
-          execute: test-helloworld

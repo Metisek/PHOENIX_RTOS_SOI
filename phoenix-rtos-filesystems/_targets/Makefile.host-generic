@@ -1,9 +1,0 @@
-#
-# Makefile for Phoenix-RTOS 3 filesystems
-#
-# host-generic drivers
-#
-# Copyright 2021 Phoenix Systems
-#
-
-DEFAULT_COMPONENTS := libmeterfs

@@ -1,7 +1,0 @@
-test:
-    type: unity
-    tests:
-        - name: unit
-          execute: test-waitpid
-          targets:
-              exclude: [armv7m7-imxrt106x-evk, armv7m7-imxrt117x-evk, armv7m4-stm32l4x6-nucleo]
