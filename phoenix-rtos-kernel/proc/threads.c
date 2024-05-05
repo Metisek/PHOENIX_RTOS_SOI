@@ -25,6 +25,8 @@
 #include "msg.h"
 #include "ports.h"
 
+extern int baseSlots;
+
 /* Special empty queue value used to wakeup next enqueued thread. This is used to implement sticky conditions */
 static thread_t *const wakeupPending = (void *)-1;
 
@@ -552,7 +554,7 @@ int _threads_schedule(unsigned int n, cpu_context_t *context, void *arg)
 	hal_lockScheduler();
 	current = _proc_current();
 	/* Do we need to reschedule or did the current thread exhaused it's time slots? */
-	if (current == NULL || current->state != READY || --current->slots <= 0) {
+	if (current == NULL || current->state != READY || --current->currentSlots <= 0) {
 		threads_common.current[hal_cpuGetID()] = NULL;
 		/* Save current thread context */
 		if (current != NULL) {
@@ -605,7 +607,10 @@ int _threads_schedule(unsigned int n, cpu_context_t *context, void *arg)
 			if (selected != NULL) {
 				/* Found a thread */
 				/* Init time slots for newly selected thread */
-				selected->slots = 8 - selected->priorityBase;
+				selected->currentSlots = 8 - selected->process->slots;
+				if (selected->currentSlots <= 0){
+					selected->currentSlots = 1;
+				}
 				LIST_REMOVE(&threads_common.ready[i], selected);
 				break;
 			}
@@ -884,9 +889,9 @@ static void _proc_threadSetPriority(thread_t *thread, unsigned int priority)
 	unsigned int i;
 
 	/* Don't allow decreasing the priority below base level */
-	if (priority > thread->priorityBase) {
-		priority = thread->priorityBase;
-	}
+	// if (priority > thread->priorityBase) {
+	// 	priority = thread->priorityBase;
+	// }
 
 	if (thread->state == READY) {
 		for (i = 0; i < hal_cpuGetCount(); i++) {

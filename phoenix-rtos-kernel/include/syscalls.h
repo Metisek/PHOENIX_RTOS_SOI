@@ -126,6 +126,12 @@
 	ID(getLongestPathPid) \
 	ID(getPathLength) \
 	\
+	ID(infiniteProcess) \
+	ID(getBaseSlots) \
+	ID(setBaseSlots) \
+	ID(getProcessSlots) \
+	ID(setProcessSlots) \
+	\
 	ID(sigreturn) \
 	\
 	ID(mprotect)

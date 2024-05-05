@@ -81,7 +81,7 @@ typedef struct _thread_t {
 	time_t cpuTime;
 	time_t lastTime;
 
-	int slots;
+	int currentSlots;
 
 	cpu_context_t *context;
 } thread_t;

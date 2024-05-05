@@ -30,6 +30,43 @@
 #define SYSCALLS_NAME(name)   syscalls_##name,
 #define SYSCALLS_STRING(name) #name,
 
+void syscalls_infiniteProcess(void* ustack){
+
+}
+
+int syscalls_getBaseSlots(void* ustack){
+	return proc_getBaseSlots();
+}
+
+void syscalls_setBaseSlots(void* ustack){
+	int slots;
+	GETFROMSTACK(ustack, int, slots, 0);
+	return proc_setBaseSlots(slots);
+}
+
+int syscalls_getProcessSlots(void* ustack){
+	pid_t pid;
+	GETFROMSTACK(ustack, pid_t, pid, 0);
+	return proc_getProcessSlots(pid);
+}
+
+void syscalls_setProcessSlots(void* ustack){
+	int pid;
+	int slots;
+	GETFROMSTACK(ustack, int, pid, 0);
+	GETFROMSTACK(ustack, int, slots, 1);
+	return proc_setProcessSlots(pid, slots);
+}
+
+
+
+
+
+
+
+
+/* Old assignments */
+
 int variable;
 
 void syscalls_setVariable(void* ustack)
@@ -41,47 +78,6 @@ int syscalls_getVariable(void* ustack)
 {
 	return variable;
 }
-
-int test_val;
-
-
-// int syscalls_getLongestPathPid(void* ustack)
-// {
-// 	GETFROMSTACK(ustack, pid_t, ignoredPid, 0);
-// }
-
-// int syscalls_getPathLength(void* ustack)
-
-// {
-// 	return variable;
-// }
-
-#define MAX_PROCESSES 1024
-
-typedef struct {
-    int pid;
-    int parentPid;
-} ProcessInfo;
-
-ProcessInfo processes[MAX_PROCESSES];
-int numProcesses = 0;
-
-// Funkcja pomocnicza do rekurencyjnego przeszukiwania potomków
-
-
-// int recursive_check(int pid, int len){
-// 	if (len > 10){
-// 		return len;
-// 	}
-
-// 	if (syscalls_getppid() != 0){
-// 		int f = proc_fork();
-// 		return recursive_check(f, len + 1);
-// 	}
-// 	else{
-// 		return 1;
-// 	}
-// }
 
 int syscalls_getLongestPathPid(void* ustack) {
     int longestPathPid = -1;

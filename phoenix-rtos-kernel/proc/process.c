@@ -29,6 +29,7 @@
 #include "ports.h"
 #include "userintr.h"
 
+int slots;
 
 typedef struct {
 	spinlock_t sl;
@@ -56,6 +57,45 @@ struct {
 	idtree_t id;
 	int idcounter;
 } process_common;
+
+int baseSlots;
+
+int proc_setBaseSlots(int slots){
+
+	if (slots < 1 || slots > 6)
+		return 0;
+	baseSlots = slots;
+	return 1;
+
+}
+
+int proc_getBaseSlots(){
+	return baseSlots;
+}
+
+int proc_setProcessSlots(int pid, int slots){
+	if (slots < 1 || slots > 6){
+		return 0;
+	}
+	process_t * process = proc_find(pid);
+	if (process == NULL){
+		return 0;
+	}
+	process->slots = slots;
+	proc_put(process);
+	return 1;
+}
+
+int proc_getProcessSlots(int pid){
+	int slots;
+	process_t * process = proc_find(pid);
+	if (process == NULL){
+		return -1;
+	}
+	slots = process->slots;
+	proc_put(process);
+	return slots;
+}
 
 
 process_t *proc_find(int pid)
@@ -1680,6 +1720,8 @@ int _process_init(vm_map_t *kmap, vm_object_t *kernel)
 
 	hal_exceptionsSetHandler(EXC_DEFAULT, process_exception);
 	hal_exceptionsSetHandler(EXC_UNDEFINED, process_illegal);
+
+	baseSlots = 4;
 	return EOK;
 }
 
