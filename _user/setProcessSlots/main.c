@@ -18,7 +18,7 @@ int main(int argc, char** argv)
         return 1;
     }
     else{
-        printf("Base slots for process %d set to: %d\n", pid, slots);
+        printf("Slots priority for process %d set to: %d\n", pid, slots);
         return 0;
     }
 

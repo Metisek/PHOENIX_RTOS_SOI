@@ -607,10 +607,13 @@ int _threads_schedule(unsigned int n, cpu_context_t *context, void *arg)
 			if (selected != NULL) {
 				/* Found a thread */
 				/* Init time slots for newly selected thread */
-				selected->currentSlots = 8 - selected->process->slots;
-				if (selected->currentSlots <= 0){
-					selected->currentSlots = 1;
-				}
+				selected->currentSlots = baseSlots;
+				// if (selected->process->slots != NULL){
+				// 	selected->currentSlots = selected->currentSlots + selected->process->slots;
+				// }
+				// if (selected->currentSlots <= 0){
+				// 	selected->currentSlots = 1;
+				// }
 				LIST_REMOVE(&threads_common.ready[i], selected);
 				break;
 			}
@@ -889,9 +892,9 @@ static void _proc_threadSetPriority(thread_t *thread, unsigned int priority)
 	unsigned int i;
 
 	/* Don't allow decreasing the priority below base level */
-	// if (priority > thread->priorityBase) {
-	// 	priority = thread->priorityBase;
-	// }
+	if (priority > thread->priorityBase) {
+		priority = thread->priorityBase;
+	}
 
 	if (thread->state == READY) {
 		for (i = 0; i < hal_cpuGetCount(); i++) {

@@ -59,11 +59,13 @@ struct {
 } process_common;
 
 int baseSlots;
+int slots;
 
 int proc_setBaseSlots(int slots){
 
-	if (slots < 1 || slots > 6)
+	if (slots < 1 || slots > 7){
 		return 0;
+	}
 	baseSlots = slots;
 	return 1;
 
@@ -74,7 +76,7 @@ int proc_getBaseSlots(){
 }
 
 int proc_setProcessSlots(int pid, int slots){
-	if (slots < 1 || slots > 6){
+	if (slots < 1 || slots > 7){
 		return 0;
 	}
 	process_t * process = proc_find(pid);
@@ -1721,7 +1723,7 @@ int _process_init(vm_map_t *kmap, vm_object_t *kernel)
 	hal_exceptionsSetHandler(EXC_DEFAULT, process_exception);
 	hal_exceptionsSetHandler(EXC_UNDEFINED, process_illegal);
 
-	baseSlots = 4;
+	baseSlots = 1;
 	return EOK;
 }
 

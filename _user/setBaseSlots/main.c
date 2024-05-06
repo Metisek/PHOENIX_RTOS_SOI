@@ -13,11 +13,11 @@ int main(int argc, char** argv)
     int slots = atoi(argv[1]);
 
     if (setBaseSlots(slots) == 0){
-        printf("Error setting value of base slots.\n");
+        printf("Error setting value of base slots priority.\n");
         return 1;
     }
     else{
-        printf("Base slots set to: %d\n", slots);
+        printf("Base slots priority set to: %d\n", slots);
         return 0;
     }
 

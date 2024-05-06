@@ -82,10 +82,16 @@ static inline int process_getPid(process_t *process)
 	return process->idlinkage.id;
 }
 
+
 extern int proc_setBaseSlots(int slots);
+
+
 extern int proc_getBaseSlots();
 
+
 extern int proc_setProcessSlots(int pid, int slots);
+
+
 extern int proc_getProcessSlots(int pid);
 
 

@@ -18,7 +18,7 @@ int main(int argc, char** argv)
         return 1;
     }
     else{
-        printf("Process %d has %d slots.\n", pid, slots);
+        printf("Process %d has %d slots priority.\n", pid, slots);
         return 0;
     }
 

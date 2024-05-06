@@ -38,7 +38,7 @@ int syscalls_getBaseSlots(void* ustack){
 	return proc_getBaseSlots();
 }
 
-void syscalls_setBaseSlots(void* ustack){
+int syscalls_setBaseSlots(void* ustack){
 	int slots;
 	GETFROMSTACK(ustack, int, slots, 0);
 	return proc_setBaseSlots(slots);
@@ -50,7 +50,7 @@ int syscalls_getProcessSlots(void* ustack){
 	return proc_getProcessSlots(pid);
 }
 
-void syscalls_setProcessSlots(void* ustack){
+int syscalls_setProcessSlots(void* ustack){
 	int pid;
 	int slots;
 	GETFROMSTACK(ustack, int, pid, 0);
