@@ -185,7 +185,6 @@ static void _perf_begin(thread_t *t)
 	_cbuffer_write(&threads_common.perfBuffer, &ev, sizeof(ev));
 }
 
-
 void perf_end(thread_t *t)
 {
 	perf_levent_end_t ev;
@@ -543,6 +542,28 @@ static void _threads_cpuTimeCalc(thread_t *current, thread_t *selected)
 static int _threads_checkSignal(thread_t *selected, process_t *proc, cpu_context_t *signalCtx, const int src);
 
 
+/* Losowa liczba 16-bitowa */
+static int rdrand16(unsigned short *value)
+{
+    unsigned char success;
+
+    asm volatile("rdrand %0; setc %1"
+                 : "=r" (*value), "=qm" (success));
+    return (int) success;
+}
+
+/* Losuj z prawdopodobieństwem 1/2 */
+static unsigned char coin_toss(void)
+{
+	unsigned short val;
+	while (!rdrand16(&val));
+
+	if (val % 2)
+		return 1;
+	else
+		return 0;
+}
+
 int _threads_schedule(unsigned int n, cpu_context_t *context, void *arg)
 {
 	thread_t *current, *selected = NULL;
@@ -596,6 +617,13 @@ int _threads_schedule(unsigned int n, cpu_context_t *context, void *arg)
 				 * total  cpu time so far.
 				 */
 				if (candidate->cpuTime < minTime) {
+					if (selected == NULL || coin_toss()) {
+						minTime = candidate->cpuTime;
+						selected = candidate;
+					}
+				}
+
+				if (coin_toss() && coin_toss()) {
 					minTime = candidate->cpuTime;
 					selected = candidate;
 				}
@@ -607,7 +635,16 @@ int _threads_schedule(unsigned int n, cpu_context_t *context, void *arg)
 			if (selected != NULL) {
 				/* Found a thread */
 				/* Init time slots for newly selected thread */
-				selected->currentSlots = baseSlots;
+				if (selected->process != NULL){
+					if (selected->process->slots){
+						selected->currentSlots = selected->process->slots + 1;
+					}
+					else{
+						selected->currentSlots = baseSlots;
+					}
+				} else{
+					selected->currentSlots = baseSlots;
+				}
 				// if (selected->process->slots != NULL){
 				// 	selected->currentSlots = selected->currentSlots + selected->process->slots;
 				// }

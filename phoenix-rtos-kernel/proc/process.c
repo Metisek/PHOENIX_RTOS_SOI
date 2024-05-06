@@ -76,7 +76,7 @@ int proc_getBaseSlots(){
 }
 
 int proc_setProcessSlots(int pid, int slots){
-	if (slots < 1 || slots > 7){
+	if (slots < 0 || slots > 7){
 		return 0;
 	}
 	process_t * process = proc_find(pid);
