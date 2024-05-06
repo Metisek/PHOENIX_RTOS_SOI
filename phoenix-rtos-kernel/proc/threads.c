@@ -564,6 +564,7 @@ static unsigned char coin_toss(void)
 		return 0;
 }
 
+
 int _threads_schedule(unsigned int n, cpu_context_t *context, void *arg)
 {
 	thread_t *current, *selected = NULL;
@@ -587,73 +588,28 @@ int _threads_schedule(unsigned int n, cpu_context_t *context, void *arg)
 			}
 		}
 		/* Get next thread */
-		for (i = 0; i < sizeof(threads_common.ready) / sizeof(thread_t *); ++i) {
-			time_t minTime = 0x7fffffffffffffffLL;
-			thread_t *candidate = threads_common.ready[i];
-			/* Iterate over all threads on the current list */
-			do {
-				if (candidate == NULL) {
-					/* No more threads on this list */
-					break;
-				}
+		for (i = 0; i < sizeof(threads_common.ready) / sizeof(thread_t *);) {
+			if ((selected = threads_common.ready[i]) == NULL) {
+				i++;
+				continue;
+			}
 
-				if (candidate->exit && !hal_cpuSupervisorMode(candidate->context)) {
-					/* Found a thread to be killed, move it to the ghost list and continue */
-					thread_t *victim = candidate;
-					candidate = candidate->next;
-					LIST_REMOVE(&threads_common.ready[i], victim);
+			LIST_REMOVE(&threads_common.ready[i], selected);
 
-					victim->state = GHOST;
-					LIST_ADD(&threads_common.ghosts, victim);
-					_proc_threadWakeup(&threads_common.reaper);
-
-				/* If we just removed the last thread then go to the next list */
-				if (threads_common.ready[i] == NULL) {
-						break;
-					}
-				}
-
-				/* Check if the currently considered thread has the lowest
-				 * total  cpu time so far.
-				 */
-				if (candidate->cpuTime < minTime) {
-					if (selected == NULL || coin_toss()) {
-						minTime = candidate->cpuTime;
-						selected = candidate;
-					}
-				}
-
-				if (coin_toss() && coin_toss()) {
-					minTime = candidate->cpuTime;
-					selected = candidate;
-				}
-
-				candidate = candidate->next;
-			} while (candidate != threads_common.ready[i]);
-
-			/* Did we find a thread on this list? */
-			if (selected != NULL) {
-				/* Found a thread */
-				/* Init time slots for newly selected thread */
-				if (selected->process != NULL){
-					if (selected->process->slots){
-						selected->currentSlots = selected->process->slots + 1;
-					}
-					else{
-						selected->currentSlots = baseSlots;
-					}
-				} else{
+			if (!selected->exit || hal_cpuSupervisorMode(selected->context)){
+				if (selected->process == NULL){
 					selected->currentSlots = baseSlots;
 				}
-				// if (selected->process->slots != NULL){
-				// 	selected->currentSlots = selected->currentSlots + selected->process->slots;
-				// }
-				// if (selected->currentSlots <= 0){
-				// 	selected->currentSlots = 1;
-				// }
-				LIST_REMOVE(&threads_common.ready[i], selected);
+				else{
+					selected->currentSlots = selected->process->slots + 1;
+				}
 				break;
 			}
+
+			selected->state = GHOST;
+			LIST_ADD(&threads_common.ghosts, selected);
+			_proc_threadWakeup(&threads_common.reaper);
+
 		}
 	}
 

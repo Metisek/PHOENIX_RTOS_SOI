@@ -81,6 +81,8 @@ typedef struct _thread_t {
 	time_t cpuTime;
 	time_t lastTime;
 
+	int switches_cnt;
+
 	int currentSlots;
 
 	cpu_context_t *context;
