@@ -5,8 +5,8 @@
 
 #define MAX_FILENAME 255
 #define MAX_FILES 100
-#define BLOCK_SIZE 4096
-#define DISK_SIZE 104857600 // 100 MB
+#define BLOCK_SIZE 512
+#define DISK_SIZE  (BLOCK_SIZE * 16)
 
 typedef struct {
     char filename[MAX_FILENAME];
@@ -69,6 +69,7 @@ void copy_to_virtual_disk(const char* disk_name, const char* src_file) {
     FILE *disk = fopen(disk_name, "rb+");
     if (disk == NULL) {
         perror("Failed to open disk");
+        fclose(src);
         exit(1);
     }
 
@@ -78,7 +79,9 @@ void copy_to_virtual_disk(const char* disk_name, const char* src_file) {
 
     if (root.file_count >= MAX_FILES) {
         fprintf(stderr, "Directory is full\n");
-        exit(1);
+        fclose(src);
+        fclose(disk);
+        return;
     }
 
     BlockMap map;
@@ -102,7 +105,9 @@ void copy_to_virtual_disk(const char* disk_name, const char* src_file) {
 
     if (start_block == -1) {
         fprintf(stderr, "Not enough space on disk\n");
-        exit(1);
+        fclose(src);
+        fclose(disk);
+        return;
     }
 
     for (int i = start_block; i < start_block + (file_size / BLOCK_SIZE) + 1; i++) {
@@ -110,7 +115,8 @@ void copy_to_virtual_disk(const char* disk_name, const char* src_file) {
     }
 
     FileEntry new_file;
-    strcpy(new_file.filename, src_file);
+    strncpy(new_file.filename, src_file, MAX_FILENAME - 1);
+    new_file.filename[MAX_FILENAME - 1] = '\0';
     new_file.size = file_size;
     new_file.start_block = start_block;
 
@@ -145,6 +151,7 @@ void copy_from_virtual_disk(const char* disk_name, const char* filename, const c
     FILE *disk = fopen(disk_name, "rb");
     if (disk == NULL) {
         perror("Failed to open disk");
+        fclose(dest);
         exit(1);
     }
 
@@ -162,7 +169,9 @@ void copy_from_virtual_disk(const char* disk_name, const char* filename, const c
 
     if (file_index == -1) {
         fprintf(stderr, "File not found on virtual disk\n");
-        exit(1);
+        fclose(dest);
+        fclose(disk);
+        return;w
     }
 
     FileEntry file = root.files[file_index];
@@ -173,14 +182,22 @@ void copy_from_virtual_disk(const char* disk_name, const char* filename, const c
     size_t bytes_read;
 
     while (bytes_to_copy > 0) {
-        bytes_read = fread(buffer, 1, BLOCK_SIZE, disk);
+        if (bytes_to_copy >= BLOCK_SIZE)
+            bytes_read = fread(buffer, 1, BLOCK_SIZE, disk);
+        else
+            bytes_read = fread(buffer, 1, bytes_to_copy, disk);
+
         fwrite(buffer, 1, bytes_read, dest);
         bytes_to_copy -= bytes_read;
+
+        if (feof(disk)) // Obsługa końca pliku
+            break;
     }
 
     fclose(dest);
     fclose(disk);
 }
+
 
 void list_virtual_disk(const char* disk_name) {
     FILE *disk = fopen(disk_name, "rb");
@@ -222,7 +239,8 @@ void delete_from_virtual_disk(const char* disk_name, const char* filename) {
 
     if (file_index == -1) {
         fprintf(stderr, "File not found on virtual disk\n");
-        exit(1);
+        fclose(disk);
+        return;
     }
 
     FileEntry file = root.files[file_index];
