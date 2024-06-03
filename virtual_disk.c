@@ -171,7 +171,7 @@ void copy_from_virtual_disk(const char* disk_name, const char* filename, const c
         fprintf(stderr, "File not found on virtual disk\n");
         fclose(dest);
         fclose(disk);
-        return;w
+        return;
     }
 
     FileEntry file = root.files[file_index];
