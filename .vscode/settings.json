@@ -1,0 +1,8 @@
+{
+    "C_Cpp.errorSquiggles": "enabled",
+    "files.associations": {
+        "getpidlength.h": "c",
+        "scheduler.h": "c"
+    },
+    "cmake.sourceDirectory": "/home/phoenix/phoenix-rtos-project/phoenix-rtos-lwip/lib-lwip"
+}
