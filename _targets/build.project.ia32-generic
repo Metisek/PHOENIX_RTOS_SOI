@@ -78,6 +78,7 @@ USER_SCRIPT=(
 	"app ${BOOT_DEVICE} -x psh;-i;/etc/rc.psh ram ram"
 	"app ${BOOT_DEVICE} -x pc-ata ram ram"
 	"app ${BOOT_DEVICE} -x serverdemo ram ram"
+	"app ${BOOT_DEVICE} -x serveruppercase ram ram"
 	"go!"
 )
 
