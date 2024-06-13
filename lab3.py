@@ -9,6 +9,7 @@ class SpecialMessage:
         self.content = content
         self.read_count = 0
         self.lock = threading.Lock()
+        self.read_consumer = []
 
     def increment_read_count(self):
         with self.lock:
@@ -26,10 +27,10 @@ class CommunicationBuffer:
         self.condition = threading.Condition()
         self.max_size = max_size
 
-    def produce(self, message, is_special=False):
+    def produce(self, message, is_special=False, special_m=None):
         with self.condition:
             if is_special:
-                special_message = SpecialMessage(message)
+                special_message = special_m
                 self.special_messages.append(special_message)
             else:
                 while self.queue.full():
@@ -41,20 +42,34 @@ class CommunicationBuffer:
         with self.condition:
             if self.special_messages:
                 with self.special_lock:
-                    special_message = self.special_messages[0]
+                    for i in range(0, len(self.special_messages)):
+                        special_message = self.special_messages[i]
+                        if consumer_id not in special_message.read_consumer:
+                            continue
+                        else:
+                            try:
+                                message = self.queue.get(timeout=timeout)
+                                self.condition.notify_all()
+                                return (message, False)
+                            except queue.Empty:
+                                return (None, False)
                     if not special_message.is_read_limit_reached():
                         special_message.increment_read_count()
+                        special_message.read_consumer.append(consumer_id)
                         return (special_message.content, True)
                     else:
                         self.special_messages.pop(0)
-                        return (None, False)
+                        if not self.special_messages:
+                            return (None, False)
+                        special_message = self.special_messages[0]
+                        special_message.increment_read_count()
+                        return (special_message.content, True)
             try:
                 message = self.queue.get(timeout=timeout)
                 self.condition.notify_all()
                 return (message, False)
             except queue.Empty:
                 return (None, False)
-
 
 class Producer(threading.Thread):
     def __init__(self, buffers, producer_id, produce_type, initial_phase=False):
@@ -79,21 +94,24 @@ class Producer(threading.Thread):
                 buffer.produce(message, is_special=False)
             elif self.produce_type == 'special':
                 message = f'S{random.randint(1, 100)}'
-                for buffer in buffers:
-                    buffer.produce(message, is_special=True)
+                special_m = SpecialMessage(message)
+                for buffer in self.buffers:
+                    buffer.produce(message, is_special=True, special_m=special_m)
             elif self.produce_type == 'mixed':
                 message_type = random.choice(['normal', 'special', 'normal', 'normal'])
                 if message_type == 'normal':
                     message = random.choice(string.ascii_letters)
+                    buffer = random.choice(self.buffers)
+                    buffer.produce(message, is_special=False)
                 else:
                     message = f'S{random.randint(1, 100)}'
-                for buffer in buffers:
-                    buffer.produce(message, is_special=(message_type == 'special'))
+                    special_m = SpecialMessage(message)
+                    for buffer in self.buffers:
+                        buffer.produce(message, is_special=True, special_m=special_m)
             time.sleep(1)  # Producing message every 1 second
 
     def stop(self):
         self.running = False
-
 
 class Consumer(threading.Thread):
     def __init__(self, buffers, consumer_id, read_delay):
@@ -114,10 +132,46 @@ class Consumer(threading.Thread):
     def stop(self):
         self.running = False
 
-
 # Testy i uruchomienie systemu
 if __name__ == "__main__":
     buffers = [CommunicationBuffer() for _ in range(3)]
+
+
+
+    print("""
+
+          TEST - Single producer producing one special message
+          followed by six normal messages
+          and a single consumer trying to read these messages.
+          """)
+
+    producer = Producer(buffers, 0, 'mixed')
+
+    # Starting the producer for a special message
+    special_message = f'S{random.randint(1, 100)}'
+    special_m = SpecialMessage(special_message)
+    for buffer in buffers:
+        buffer.produce(special_message, is_special=True, special_m=special_m)
+
+    # Producing six normal messages
+    for _ in range(6):
+        normal_message = random.choice(string.ascii_letters)
+        buffer = random.choice(buffers)
+        buffer.produce(normal_message, is_special=False)
+
+    # Starting the consumer
+    consumers_s = [Consumer(buffers, i, random.uniform(0.1, 0.5)) for i in range(2)]
+    for consumer in consumers_s:
+        consumer.start()
+
+    # Allow some time for the consumer to process the messages
+    time.sleep(3)
+
+    # Stopping the consumer
+    for consumer in consumers_s:
+        consumer.stop()
+    for consumer in consumers_s:
+        consumer.join()
 
     print("""
 
@@ -149,13 +203,10 @@ if __name__ == "__main__":
           """)
 
     # Produkcja jednej wiadomości specjalnej z kopią na każdy bufor
+    message = f'S{random.randint(1, 100)}'
+    s_m = SpecialMessage(message)
     for buffer in buffers:
-        buffer.produce("Special Message", is_special=True)
-
-    # Startujemy konsumentów
-    consumers = [Consumer(buffers, i, random.uniform(0.1, 0.5)) for i in range(8)]
-    for consumer in consumers:
-        consumer.start()
+        buffer.produce(s_m, is_special=True, special_m=s_m)
 
     # Czekamy aż wiadomość specjalna zostanie odczytana 3 razy
     time.sleep(3)
@@ -170,16 +221,55 @@ if __name__ == "__main__":
     # Nowy bufor komunikacyjny dla testu 3
     single_buffer = [CommunicationBuffer()]
 
-    # Produkcja jednej wiadomości specjalnej z kopią na każdy bufor
-    for buffer in single_buffer:
-        buffer.produce("Special Message", is_special=True)
+    single_consumers = [Consumer(single_buffer, i, random.uniform(0.1, 0.5)) for i in range(8)]
 
-    # Startujemy konsumentów
-    consumers = [Consumer(single_buffer, i, random.uniform(0.1, 0.5)) for i in range(8)]
-    for consumer in consumers:
+    for consumer in single_consumers:
         consumer.start()
+
+    # Produkcja jednej wiadomości specjalnej z kopią na każdy bufor
+    message = f'S{random.randint(1, 100)}'
+    s_m = SpecialMessage(message)
+    for buffer in single_buffer:
+        buffer.produce(s_m, is_special=True, special_m=s_m)
+
+
+
 
     # Czekamy aż wiadomość specjalna zostanie odczytana 3 razy
     time.sleep(3)
+
+    print("""
+
+          TEST 4 - działanie bez przerwy przez 10 sekund
+
+          """)
+
+    # Tworzenie producentów
+    continuous_producers = [Producer(buffers, i, 'mixed') for i in range(5)]
+    for producer in continuous_producers:
+        producer.start()
+
+    # Startowanie konsumentów
+    continuous_consumers = [Consumer(buffers, i, random.uniform(0.1, 0.5)) for i in range(8)]
+    for consumer in continuous_consumers:
+        consumer.start()
+
+    # Praca przez 10 sekund
+    time.sleep(10)
+
+    # Zatrzymywanie producentów
+    for producer in continuous_producers:
+        producer.stop()
+    for producer in continuous_producers:
+        producer.join()
+
+    # Zatrzymywanie konsumentów
+    for consumer in continuous_consumers:
+        consumer.stop()
+    for consumer in continuous_consumers:
+        consumer.join()
+
+
+
 
     print("Testy zakończone.")
