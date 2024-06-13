@@ -4,7 +4,7 @@ import time
 import random
 import string
 
-class CommunicationBuffer:
+class CommunicationBufferMonitor:
     def __init__(self, max_size=10):
         self.queue = queue.Queue(max_size)
         self.special_messages = []
@@ -116,63 +116,62 @@ def change_production(producers, new_type):
         producer.produce_type = new_type
 
 
-# Testy i uruchomienie systemu
+# Test and launch the system
 if __name__ == "__main__":
-    buffers = [CommunicationBuffer() for _ in range(3)]
+    buffers = [CommunicationBufferMonitor() for _ in range(3)]
 
     print("""
 
-          TEST 1 - po 1  wiadomości zwykłej dla każdego bufora
-          od każdego z 5 producentów - 15 wiadomości
+          TEST 1 - one normal message per buffer
+          from each of 5 producers - 15 messages in total
 
           """)
 
-    # Faza początkowa - 5 producentów produkuje po 1 wiadomości dla każdego bufora
+    # Initial phase - 5 producers produce one message for each buffer
     initial_producers = [Producer(buffers, i, 'normal', initial_phase=True) for i in range(5)]
     for producer in initial_producers:
         producer.start()
     for producer in initial_producers:
         producer.join()
 
-    # Startujemy konsumentów
+    # Start consumers
     consumers = [Consumer(buffers, i, random.uniform(0.1, 0.5)) for i in range(8)]
     for consumer in consumers:
         consumer.start()
 
-    # Czekamy aż konsumenci odczytają wszystkie wiadomości zwykłe
+    # Wait for consumers to read all normal messages
     time.sleep(2)
 
     print("""
 
-          TEST 2 - 1 wiadomość specjalna, odczyt każdego konsumenta
+          TEST 2 - one special message, read by every consumer
 
           """)
 
-    # Produkcja jednej wiadomości specjalnej przez losowego producenta
+    # Produce one special message by a random producer
     special_producer = Producer(buffers, 0, 'special', initial_phase=False)
     special_producer.start()
     time.sleep(1)
     special_producer.stop()
     special_producer.join()
 
-    # Czekamy aż konsumenci odczytają wiadomość specjalną
+    # Wait for consumers to read the special message
     time.sleep(3)
-
 
     print("""
 
-          TEST 3 - Wiadomości zmieszane, bez limitu
+          TEST 3 - Mixed messages, no limit
 
           """)
 
-    # Startujemy normalne testy na 5 sekund
+    # Start normal tests for 5 seconds
     producers = [Producer(buffers, i, 'mixed') for i in range(5)]
     for producer in producers:
         producer.start()
 
     time.sleep(5)
 
-    # Zatrzymujemy producentów i konsumentów
+    # Stop producers and consumers
     for producer in producers:
         producer.stop()
     for producer in producers:
@@ -183,4 +182,4 @@ if __name__ == "__main__":
     for consumer in consumers:
         consumer.join()
 
-    print("Test zakończony.")
+    print("Test concluded.")
